@@ -1,0 +1,12 @@
+{
+  "name": "idea-capture",
+  "version": "1.0.0",
+  "description": "随时随地记录想法，每日自动归档到 Obsidian",
+  "vault_path": "/Users/Shared/obsidian_share/leo-ideas",
+  "github_repo": "leo-ideas-vault",
+  "daily_folder": "01-Daily",
+  "inbox_file": "data/inbox.json",
+  "template_file": "templates/daily-ideas-template.md",
+  "archive_time": "23:50",
+  "timezone": "Asia/Shanghai"
+}
