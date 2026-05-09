@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>标题</title>
+<style>
+:root {
+  --ivory:   #FAF9F5;
+  --slate:   #141413;
+  --clay:    #D97757;
+  --oat:     #E3DACC;
+  --olive:   #788C5D;
+  --gray-150:#F0EEE6;
+  --gray-300:#D1CFC5;
+  --gray-500:#87867F;
+  --gray-700:#3D3D3A;
+  --white:   #FFFFFF;
+  --serif: ui-serif, Georgia, "Times New Roman", serif;
+  --sans:  system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono:  ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--ivory);
+  color: var(--gray-700);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  padding: 48px 24px 80px;
+}
+.page { max-width: 920px; margin: 0 auto; }
+
+/* Header */
+.eyebrow {
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--gray-500); margin-bottom: 12px;
+}
+h1 {
+  font-family: var(--serif); font-weight: 500;
+  font-size: 36px; line-height: 1.15; color: var(--slate);
+  margin-bottom: 18px; letter-spacing: -0.01em;
+}
+.prompt-box {
+  background: var(--gray-150); border: 1.5px solid var(--gray-300);
+  border-radius: 12px; padding: 16px 20px; font-size: 14.5px;
+}
+.prompt-box .label {
+  font-family: var(--mono); font-size: 11px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--gray-500); display: block; margin-bottom: 6px;
+}
+
+/* Section */
+section { margin-bottom: 40px; }
+h2 {
+  font-family: var(--serif); font-weight: 500;
+  font-size: 22px; color: var(--slate); margin-bottom: 14px;
+}
+
+/* Card */
+.card {
+  background: var(--white); border: 1.5px solid var(--gray-300);
+  border-radius: 12px; padding: 24px;
+}
+.card + .card { margin-top: 16px; }
+
+/* Code */
+.code-block {
+  background: var(--slate); color: #E8E6DC;
+  font-family: var(--mono); font-size: 13px;
+  line-height: 1.7; border-radius: 10px;
+  padding: 18px 20px; overflow-x: auto;
+  margin: 16px 0;
+}
+.code-block .kw  { color: var(--clay); }
+.code-block .str { color: var(--olive); }
+.code-block .cm  { color: var(--gray-500); }
+
+/* Table */
+table {
+  width: 100%; border-collapse: collapse;
+  font-size: 14px;
+}
+th, td {
+  padding: 10px 14px; text-align: left;
+  border-bottom: 1.5px solid var(--gray-150);
+}
+th { font-family: var(--mono); font-size: 12px; color: var(--gray-500); text-transform: uppercase; }
+
+/* Tags */
+.tag {
+  display: inline-block; font-family: var(--mono); font-size: 12px;
+  background: var(--gray-150); border: 1.5px solid var(--gray-300);
+  color: var(--gray-700); padding: 4px 10px; border-radius: 8px;
+}
+
+/* Grid */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+@media (max-width: 800px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Category · Project</div>
+    <h1>Main Title</h1>
+    <div class="prompt-box">
+      <span class="label">Prompt</span>
+      The prompt that generated this document.
+    </div>
+  </header>
+
+  <!-- Content goes here -->
+
+</div>
+</body>
+</html>

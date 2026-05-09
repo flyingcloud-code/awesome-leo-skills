@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>代码审查 — PR #</title>
+<style>
+:root {
+  --ivory:   #FAF9F5; --slate:   #141413; --clay:    #D97757;
+  --oat:     #E3DACC; --olive:   #788C5D; --rust:    #B04A3F;
+  --gray-150:#F0EEE6; --gray-300:#D1CFC5; --gray-500:#87867F;
+  --gray-700:#3D3D3A; --white:   #FFFFFF;
+  --serif: ui-serif, Georgia, serif;
+  --sans:  system-ui, -apple-system, sans-serif;
+  --mono:  ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--ivory); color: var(--gray-700);
+  font-family: var(--sans); font-size: 15px; line-height: 1.6;
+  padding: 48px 24px 80px;
+}
+.page { max-width: 920px; margin: 0 auto; }
+
+/* PR Header */
+.pr-head {
+  border: 1.5px solid var(--gray-300); border-radius: 12px;
+  padding: 28px 32px; background: var(--white); margin-bottom: 36px;
+}
+.repo-line { font-family: var(--mono); font-size: 12.5px; color: var(--gray-500); margin-bottom: 10px; }
+h1 { font-family: var(--serif); font-weight: 500; font-size: 30px; color: var(--slate); margin-bottom: 18px; }
+.meta-row { display: flex; align-items: center; flex-wrap: wrap; gap: 20px; }
+.author { display: flex; align-items: center; gap: 10px; }
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--oat);
+  color: var(--slate); display: flex; align-items: center; justify-content: center;
+  font-weight: 600; font-size: 13px; border: 1.5px solid var(--gray-300);
+}
+.branch {
+  font-family: var(--mono); font-size: 12.5px; color: var(--gray-700);
+  background: var(--gray-150); border: 1.5px solid var(--gray-300);
+  border-radius: 8px; padding: 6px 10px;
+}
+.stat { font-family: var(--mono); font-size: 13px; }
+.stat .add { color: var(--olive); font-weight: 600; }
+.stat .del { color: var(--rust); font-weight: 600; }
+
+/* Summary */
+h2 { font-family: var(--serif); font-weight: 500; font-size: 21px; color: var(--slate); margin-bottom: 14px; }
+section { margin-bottom: 40px; }
+ul { list-style: none; padding: 0; }
+li { padding-left: 22px; margin-bottom: 10px; position: relative; }
+li::before { content: ""; position: absolute; left: 4px; top: 9px; width: 6px; height: 6px; background: var(--gray-500); border-radius: 2px; }
+
+/* Risk map */
+.risk-map { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 8px; border: 1.5px solid var(--gray-300);
+  font-family: var(--mono); font-size: 12.5px; color: var(--slate);
+  background: var(--white); text-decoration: none;
+}
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; }
+.chip.safe { background: rgba(120,140,93,0.10); border-color: rgba(120,140,93,0.45); }
+.chip.safe .dot { background: var(--olive); }
+.chip.medium { background: var(--oat); border-color: #D1CFC5; }
+.chip.medium .dot { background: #B89B6E; }
+.chip.attention { background: rgba(217,119,87,0.12); border-color: rgba(217,119,87,0.55); }
+.chip.attention .dot { background: var(--clay); }
+
+/* File card */
+.file-card { border: 1.5px solid var(--gray-300); border-radius: 12px; background: var(--white); margin-bottom: 24px; overflow: hidden; }
+.file-head { padding: 16px 20px; border-bottom: 1.5px solid var(--gray-150); display: flex; align-items: center; justify-content: space-between; }
+.file-path { font-family: var(--mono); font-size: 13.5px; color: var(--slate); }
+
+/* Diff */
+.diff { background: var(--slate); font-family: var(--mono); font-size: 12.5px; line-height: 1.7; overflow-x: auto; }
+.diff-row { display: grid; grid-template-columns: 48px 18px 1fr; align-items: baseline; padding: 0 14px 0 0; white-space: pre; }
+.diff-row .ln { text-align: right; padding-right: 14px; color: var(--gray-500); user-select: none; }
+.diff-row .mark { text-align: center; color: var(--gray-500); }
+.diff-row .code { color: #E8E6DC; }
+.diff-row.add { background: rgba(120,140,93,0.15); }
+.diff-row.add .mark { color: var(--olive); }
+.diff-row.del { background: rgba(176,74,63,0.15); }
+.diff-row.del .mark { color: var(--rust); }
+.diff-row.hunk { background: rgba(255,255,255,0.04); color: var(--gray-500); }
+
+/* Comments */
+.comments { padding: 18px 20px 20px; background: var(--gray-150); }
+.bubble { background: var(--white); border: 1.5px solid var(--gray-300); border-left-width: 4px; border-radius: 8px; padding: 12px 14px 12px 16px; margin-bottom: 14px; max-width: 680px; }
+.bubble.blocking { border-left-color: var(--clay); }
+.bubble.nit { border-left-color: var(--gray-300); }
+.bubble .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-right: 8px; }
+.bubble.blocking .label { color: var(--clay); }
+.bubble p { font-size: 13.5px; }
+.bubble code { font-family: var(--mono); font-size: 12.5px; background: var(--gray-150); padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="pr-head">
+    <div class="repo-line">repo · Pull Request #</div>
+    <h1>PR Title</h1>
+    <div class="meta-row">
+      <div class="author">
+        <div class="avatar">XX</div>
+        <div><div class="author-name">Name</div><div style="font-size:12px;color:var(--gray-500)">opened X days ago</div></div>
+      </div>
+      <div class="branch">branch <span style="color:var(--gray-500);margin:0 6px">→</span> main</div>
+      <div class="stat"><span class="add">+XX</span> / <span class="del">−XX</span> <span style="color:var(--gray-500);margin-left:10px">N files</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Summary</h2>
+    <ul>
+      <li>Key change description</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Files</h2>
+    <!-- File cards go here -->
+  </section>
+</div>
+</body>
+</html>
