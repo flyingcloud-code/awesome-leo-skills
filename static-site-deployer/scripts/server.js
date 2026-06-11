@@ -358,46 +358,62 @@ staticApp.get('/', (req, res) => {
   res.send(html);
 });
 
-// ========== Start Servers ==========
+// ========== Combine & Start ==========
 
 const HOST = '0.0.0.0'; // Listen on all network interfaces
 
-const apiServer = apiApp.listen(CONFIG.apiPort, HOST, () => {
-  console.log(`\n🦐 Static Site Deployer API running on http://0.0.0.0:${CONFIG.apiPort}`);
-  console.log(`   POST   /api/deploy       - Upload zip`);
-  console.log(`   POST   /api/deploy/html   - Deploy raw HTML`);
-  console.log(`   POST   /api/deploy/url    - Deploy from URL`);
-  console.log(`   GET    /api/sites         - List sites`);
-  console.log(`   GET    /api/sites/:id     - Site details`);
-  console.log(`   DELETE /api/sites/:id     - Delete site`);
-});
+// Merge: API routes take priority, static files serve everything else
+// API is already mounted on apiApp, static on staticApp
+// We run both on the same port so external access is simpler
+// If STATIC_API_PORT equals STATIC_SERVE_PORT, combine them
+const useSinglePort = CONFIG.apiPort === CONFIG.staticPort;
 
-const staticServer = staticApp.listen(CONFIG.staticPort, HOST, () => {
-  console.log(`\n📦 Static files server running on http://0.0.0.0:${CONFIG.staticPort}`);
-  console.log(`📁 Sites directory: ${CONFIG.sitesDir}`);
-  console.log(`🔗 Public URL: ${CONFIG.publicUrl}`);
-  if (CONFIG.authToken) {
-    console.log(`🔒 Auth: Bearer token enabled`);
-  } else {
-    console.log(`⚠️  Auth: DISABLED (set STATIC_AUTH_TOKEN to enable)`);
-  }
-  console.log('');
-});
+if (useSinglePort) {
+  // Mount static app as fallback middleware on API app
+  apiApp.use(staticApp);
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('Shutting down...');
-  apiServer.close();
-  staticServer.close();
-  process.exit(0);
-});
+  const server = apiApp.listen(CONFIG.apiPort, HOST, () => {
+    console.log(`\n🦐 Static Site Deployer running on http://0.0.0.0:${CONFIG.apiPort}`);
+    console.log(`   🔧 API:   /api/*`);
+    console.log(`   📦 Sites: /<site-id>/*`);
+    console.log(`   📁 Directory: ${CONFIG.sitesDir}`);
+    console.log(`   🔗 Public URL: ${CONFIG.publicUrl}`);
+    if (CONFIG.authToken) {
+      console.log(`   🔒 Auth: Bearer token enabled`);
+    } else {
+      console.log(`   ⚠️  Auth: DISABLED (set STATIC_AUTH_TOKEN to enable)`);
+    }
+    console.log('');
+  });
 
-process.on('SIGINT', () => {
-  console.log('Shutting down...');
-  apiServer.close();
-  staticServer.close();
-  process.exit(0);
-});
+  process.on('SIGTERM', () => { console.log('Shutting down...'); server.close(); process.exit(0); });
+  process.on('SIGINT', () => { console.log('Shutting down...'); server.close(); process.exit(0); });
+} else {
+  const apiServer = apiApp.listen(CONFIG.apiPort, HOST, () => {
+    console.log(`\n🦐 Static Site Deployer API running on http://0.0.0.0:${CONFIG.apiPort}`);
+    console.log(`   POST   /api/deploy       - Upload zip`);
+    console.log(`   POST   /api/deploy/html   - Deploy raw HTML`);
+    console.log(`   POST   /api/deploy/url    - Deploy from URL`);
+    console.log(`   GET    /api/sites         - List sites`);
+    console.log(`   GET    /api/sites/:id     - Site details`);
+    console.log(`   DELETE /api/sites/:id     - Delete site`);
+  });
+
+  const staticServer = staticApp.listen(CONFIG.staticPort, HOST, () => {
+    console.log(`\n📦 Static files server running on http://0.0.0.0:${CONFIG.staticPort}`);
+    console.log(`📁 Sites directory: ${CONFIG.sitesDir}`);
+    console.log(`🔗 Public URL: ${CONFIG.publicUrl}`);
+    if (CONFIG.authToken) {
+      console.log(`🔒 Auth: Bearer token enabled`);
+    } else {
+      console.log(`⚠️  Auth: DISABLED (set STATIC_AUTH_TOKEN to enable)`);
+    }
+    console.log('');
+  });
+
+  process.on('SIGTERM', () => { console.log('Shutting down...'); apiServer.close(); staticServer.close(); process.exit(0); });
+  process.on('SIGINT', () => { console.log('Shutting down...'); apiServer.close(); staticServer.close(); process.exit(0); });
+}
 
 // ========== Helper Functions ==========
 
