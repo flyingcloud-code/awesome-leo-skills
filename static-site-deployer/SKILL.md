@@ -7,164 +7,177 @@ description: "Self-hosted static site deployment API service. Use when: (1) Depl
 
 A lightweight, self-hosted static site deployment service. Accepts zip files or raw HTML content via REST API and serves them immediately.
 
-**→ 所有 Agent 共享！** 部署一次，所有 Agent（虾宝、马冬梅、夏洛克）都能通过 HTTP API 调用。
+**→ 所有 Agent 共享！** 可在多台机器之间使用。
 
 ---
 
 ## Architecture
 
+虾宝的机器（运行 API + 静态服务）：
+
 ```
 Agent ──POST──▶ Deploy API (port 3456) ──▶ static-sites/{id}/ ──▶ HTTP Server (port 3457)
   │                                                    ▲
-  └─── Feishu zip upload ───▶ auto-deploy ─────────────┘
+  ├── 本机: localhost:3456                              │
+  ├── 远程: SSH 隧道 / Cloudflare Tunnel ───────────────┘
+  └── 多机: sessions_send 传文件给虾宝
 ```
-
-- **API Server**: Express on port `3456`, handles deploy/list/delete
-- **Static Server**: Express on port `3457`, serves deployed files
-- **Storage**: `~/.openclaw/workspace/static-sites/{id}/`
-- **Auth**: Bearer token (set `STATIC_AUTH_TOKEN`)
-- **Auto-start**: systemd user service
 
 ---
 
-## 🔌 Feishu 集成 — 在聊天框发 zip 自动部署
+## 多机部署方案
 
-**这是虾宝特有的能力**——当用户在飞书聊天中发送 zip 文件时：
+其他机器上的 Agent 可以通过三种方式访问部署 API：
 
-### 工作流
+### 方案 A：SSH 隧道（推荐，最安全）
 
-1. 用户发消息附带 zip 文件
-2. 虾宝识别出是静态网站项目（HTML/CSS/JS）
-3. 从飞书消息中获取文件信息
-4. 下载文件到本地临时目录
-5. 调用 `POST /api/deploy` 部署
-6. 回复用户部署 URL
+其他机器执行：
+```bash
+ssh -L 3456:localhost:3456 root@47.85.20.56
+# 然后在本机：curl http://localhost:3456/api/deploy ...
+```
 
-### 虾宝的实现方式
+或者用 SSH 隧道 + 直接执行部署（一行搞定）：
+```bash
+ssh root@47.85.20.56 "curl -s -X POST http://localhost:3456/api/deploy \
+  -H 'Authorization: Bearer \$STATIC_AUTH_TOKEN' \
+  -F 'file=@-'" < ./site.zip
+```
+
+### 方案 B：Cloudflare Tunnel（免费，有 SSL）
+
+在虾宝的机器上装 cloudflared：
+```bash
+# 安装
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+chmod +x /usr/local/bin/cloudflared
+
+# 创建隧道（把 sites.你的域名.com 指向 3457）
+cloudflared tunnel create static-sites
+cloudflared tunnel route dns static-sites sites.你的域名.com
+
+# 配置文件 /etc/cloudflared/config.yml
+# tunnel: static-sites
+# ingress:
+#   - hostname: api.sites.你的域名.com
+#     service: http://localhost:3456
+#   - hostname: sites.你的域名.com  
+#     service: http://localhost:3457
+#   - service: http_status:404
+
+# 启动
+cloudflared tunnel run static-sites
+```
+
+配置好后，其他机器直接：
+```bash
+STATIC_API_URL=https://api.sites.你的域名.com \
+STATIC_AUTH_TOKEN=xxx \
+node deploy.mjs deploy-zip ./site.zip
+```
+
+### 方案 C：Agent 互传（无需网络打通）
+
+其他 Agent 通过 OpenClaw 的消息系统发给虾宝：
 
 ```markdown
-当用户在飞书发了一条带附件/文件的消息：
+其他 Agent 发消息给虾宝（sessions_send）：
+  "虾宝，请帮我部署这个页面"
+  + 附上文件或 URL
 
-1. 查看消息里的 file key / file token
-2. 用 `message.download` 或 Feishu 文件 API 获取文件内容
-3. 如果文件是 .zip 格式 → 保存到临时路径 → 调 deploy API
-4. 回复用户部署完成的消息 + URL
+虾宝收到后：
+  1. 下载文件
+  2. 调 POST /api/deploy 
+  3. 把 URL 回复给那个 Agent
+```
 
-注意：优先识别以 .zip 结尾或 Content-Type 为 application/zip 的附件
+完全不需要网络互通，但走的是消息通道，不适合大文件。
+
+---
+
+## 实际操作示例
+
+### 当前配置
+
+| 项目 | 值 |
+|------|-----|
+| 虾宝服务器 | 47.85.20.56 |
+| API 端口 | 3456（内网 / 隧道访问） |
+| 静态端口 | 3457 |
+| Auth Token | 存在 systemd 环境变量里 |
+
+### 本地 CLI 用法
+
+```bash
+# 从本机
+STATIC_AUTH_TOKEN=xxx node scripts/deploy.mjs deploy-zip ./site.zip --id my-site
+
+# 查看当前配置
+STATIC_AUTH_TOKEN=xxx node scripts/deploy.mjs config
+```
+
+### 远程 CLI 用法（通过 SSH 隧道）
+
+```bash
+# 在另一台电脑上
+export STATIC_API_URL=http://localhost:3456  # 本地 SSH 隧道端口
+export STATIC_AUTH_TOKEN=xxx
+
+# 部署 zip
+node deploy.mjs deploy-zip ./my-site.zip --id my-site
+
+# 部署原始 HTML
+node deploy.mjs deploy-content --content "<h1>Hello</h1>" --id hello
+
+# 列出站点
+node deploy.mjs list
+```
+
+### 直接 curl（远程，通过隧道）
+
+```bash
+curl -X POST http://localhost:3456/api/deploy \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@./site.zip" \
+  -F "id=my-site"
 ```
 
 ---
 
-## 🤖 Agent 工作流示例
+## Agent 工作流示例
 
 ### 示例 1：马冬梅 — 写完日报自动部署
 
 ```markdown
-场景：马冬梅（ai-writer）每天早上 7:00 生成 AI 科技日报
-
-工作流：
 1. 使用 Tavily + SearXNG 搜索最新 AI 新闻
-2. 整理成一份漂亮的 HTML 日报（含样式、链接、时间线）
-3. 调用 deploy API 部署：
+2. 整理成 HTML 日报
+3. 调 deploy API：
 
    curl -X POST http://localhost:3456/api/deploy/html \
      -H "Authorization: Bearer $STATIC_AUTH_TOKEN" \
      -H "Content-Type: application/json" \
-     -d '{
-       "content": "<html>完整的日报内容...</html>",
-       "id": "ai-daily-2026-06-11"
-     }'
+     -d '{"content":"<html>完整的日报内容...</html>","id":"ai-daily-2026-06-11"}'
 
-4. 拿到返回的 URL → 直接发到飞书群
-5. ✅ 不用 GitHub，不用推代码，一步到位
+4. 拿到返回的 URL → 直接发到飞书
 ```
 
 ### 示例 2：夏洛克 — 股票报告可视化
 
 ```markdown
-场景：夏洛克生成带图表的股票分析报告
-
-工作流：
-1. 分析股票数据，生成带图表的 HTML 报告
-2. 将 HTML 和关联资源打包成 zip
-3. 调用 deploy API 上传 zip：
-
-   curl -X POST http://localhost:3456/api/deploy \
-     -H "Authorization: Bearer $STATIC_AUTH_TOKEN" \
-     -F "file=@/tmp/stock-report.zip" \
-     -F "id=stock-analysis-tsla-20260611"
-
-4. 分享 URL 给用户
-5. 用户可以直接在浏览器中查看完整的可视化报告
+1. 分析股票数据，生成带图表的 HTML
+2. 将 HTML 和资源打包成 zip
+3. 调 deploy API 上传 zip
+4. 分享 URL 给用户（浏览器查看完整可视化报告）
 ```
 
 ### 示例 3：虾宝 — 用户发 zip 直接部署
 
 ```markdown
-用户发来一个 "帮我部署这个页面" 并附带 zip 文件：
+用户发来 "帮我部署这个页面" + zip 文件：
 
-虾宝执行：
-1. 检测附件为 zip → 下载到 /tmp/xxx.zip
-2. 调 deploy API：
-
-   curl -X POST http://localhost:3456/api/deploy \
-     -H "Authorization: Bearer $TOKEN" \
-     -F "file=@/tmp/xxx.zip" \
-     -F "id=custom-site-name"
-
-3. 回复用户：
-   🦐 部署好啦！
-   📍 https://sites.example.com/custom-site-name
-   📁 共 12 个文件
-```
-
----
-
-## 🚀 Quick Start
-
-### Start the server (already running as systemd service)
-
-```bash
-# Check status
-systemctl --user status static-site-deployer
-
-# View logs
-tail -f ~/.openclaw/workspace/logs/static-deployer.log
-```
-
-### Using the CLI
-
-```bash
-# Deploy a zip
-cd ~/.openclaw/workspace/awesome-leo-skills/static-site-deployer
-STATIC_AUTH_TOKEN=xxx node scripts/deploy.mjs deploy-zip ./site.zip --id my-site
-
-# Deploy HTML
-STATIC_AUTH_TOKEN=xxx node scripts/deploy.mjs deploy-content --content "<h1>Hi</h1>" --id hello
-
-# List sites
-STATIC_AUTH_TOKEN=xxx node scripts/deploy.mjs list
-```
-
-### Using the REST API (from any agent)
-
-```bash
-# Health
-curl http://localhost:3456/api/health
-
-# Deploy zip (multipart upload)
-curl -X POST http://localhost:3456/api/deploy \
-  -H "Authorization: Bearer $TOKEN" \
-  -F "file=@./dist.zip" -F "id=my-site"
-
-# Deploy raw HTML
-curl -X POST http://localhost:3456/api/deploy/html \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"content":"<h1>Hello</h1>","id":"hello"}'
-
-# List all sites
-curl -H "Authorization: Bearer $TOKEN" http://localhost:3456/api/sites
+1. 检测附件为 zip → 保存到 /tmp/
+2. 调 deploy API
+3. 回复用户：URL + 文件数
 ```
 
 ---
@@ -179,47 +192,9 @@ See [references/api.md](references/api.md) for full API documentation.
 | `POST` | `/api/deploy/html` | Deploy raw HTML (JSON) |
 | `POST` | `/api/deploy/url` | Deploy zip from a URL |
 | `GET` | `/api/sites` | List all deployed sites |
-| `GET` | `/api/sites/:id` | Get site details |
+| `GET` | `/api/sites/:id` | Get site details / file listing |
 | `DELETE` | `/api/sites/:id` | Delete a site |
 | `GET` | `/api/health` | Health check |
-
----
-
-## Programmatic Usage (for scripts and agents)
-
-```javascript
-// Any agent's Node.js script can be this simple:
-const TOKEN = 'your-token';
-const API = 'http://localhost:3456';
-
-async function deployHTML(html, id) {
-  const res = await fetch(`${API}/api/deploy/html`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ content: html, id }),
-  });
-  return res.json(); // { id, url, fileCount }
-}
-
-async function deployZip(zipPath, id) {
-  const form = new FormData();
-  form.append('file', await fs.promises.readFile(zipPath), 'site.zip');
-  if (id) form.append('id', id);
-  const res = await fetch(`${API}/api/deploy`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${TOKEN}` },
-    body: form,
-  });
-  return res.json();
-}
-
-// Usage:
-const { url } = await deployHTML('<h1>Report</h1>', 'daily-report');
-console.log(`Deployed at: ${url}`);
-```
 
 ---
 
@@ -227,24 +202,11 @@ console.log(`Deployed at: ${url}`);
 
 | Env Variable | Default | Description |
 |---|---|---|
+| `STATIC_API_URL` | `http://localhost:3456` | API server URL (for CLI/agents) |
 | `STATIC_API_PORT` | `3456` | API server port |
 | `STATIC_SERVE_PORT` | `3457` | Static file server port |
 | `STATIC_SITES_DIR` | `~/.openclaw/workspace/static-sites/` | Storage directory |
-| `STATIC_AUTH_TOKEN` | (set during install) | Bearer token |
-| `STATIC_PUBLIC_URL` | `http://localhost:3457` | Public base URL |
-
----
-
-## Installation (one-time)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/flyingcloud-code/awesome-leo-skills/main/static-site-deployer/scripts/install.sh | bash
-```
-
-Or manual:
-
-```bash
-cd ~/.openclaw/workspace/skills/static-site-deployer
-npm install
-bash scripts/install.sh
-```
+| `STATIC_AUTH_TOKEN` | (set during install) | Bearer token for auth |
+| `STATIC_PUBLIC_URL` | `http://localhost:3457` | Public base URL for deployed sites |
+| `STATIC_MAX_SIZE` | `52428800` (50MB) | Max upload size |
+| `STATIC_CORS` | `*` | CORS origin |

@@ -360,8 +360,10 @@ staticApp.get('/', (req, res) => {
 
 // ========== Start Servers ==========
 
-const apiServer = apiApp.listen(CONFIG.apiPort, () => {
-  console.log(`\n🦐 Static Site Deployer API running on http://localhost:${CONFIG.apiPort}`);
+const HOST = '0.0.0.0'; // Listen on all network interfaces
+
+const apiServer = apiApp.listen(CONFIG.apiPort, HOST, () => {
+  console.log(`\n🦐 Static Site Deployer API running on http://0.0.0.0:${CONFIG.apiPort}`);
   console.log(`   POST   /api/deploy       - Upload zip`);
   console.log(`   POST   /api/deploy/html   - Deploy raw HTML`);
   console.log(`   POST   /api/deploy/url    - Deploy from URL`);
@@ -370,8 +372,8 @@ const apiServer = apiApp.listen(CONFIG.apiPort, () => {
   console.log(`   DELETE /api/sites/:id     - Delete site`);
 });
 
-const staticServer = staticApp.listen(CONFIG.staticPort, () => {
-  console.log(`\n📦 Static files server running on http://localhost:${CONFIG.staticPort}`);
+const staticServer = staticApp.listen(CONFIG.staticPort, HOST, () => {
+  console.log(`\n📦 Static files server running on http://0.0.0.0:${CONFIG.staticPort}`);
   console.log(`📁 Sites directory: ${CONFIG.sitesDir}`);
   console.log(`🔗 Public URL: ${CONFIG.publicUrl}`);
   if (CONFIG.authToken) {
