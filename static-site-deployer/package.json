@@ -1,0 +1,23 @@
+{
+  "name": "static-site-deployer",
+  "version": "1.0.0",
+  "description": "Self-hosted static site deployment API",
+  "main": "scripts/server.js",
+  "scripts": {
+    "start": "node scripts/server.js",
+    "start:bg": "nohup node scripts/server.js > server.log 2>&1 &",
+    "deploy": "node scripts/deploy.mjs",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "multer": "^2.1.1",
+    "unzipper": "^0.12.3",
+    "uuid": "^14.0.0"
+  }
+}
